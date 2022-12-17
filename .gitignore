@@ -130,6 +130,6 @@ dmypy.json
 
 # vscode
 .vscode/
-datasets/
+/datasets
 model_zoo/
 output/
