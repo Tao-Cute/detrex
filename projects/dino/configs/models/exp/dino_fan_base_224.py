@@ -7,7 +7,7 @@ from ..dino_r50 import model
 model.backbone = L(fan_base_12_p4_hybrid)(
     out_ids=[1, 2 ,3],
     if_vit=True,
-    patch_embed="MyConv"
+    patch_embed="ConvNext"
 )
 
 model.neck.input_shapes = {
