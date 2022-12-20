@@ -8,4 +8,4 @@ from ..models.exp.dino_maevit_ConvNext import model
 
 # modify training config
 train.init_checkpoint = "model_zoo/pretrained_model/mae_pretrain_vit_base.pth"
-train.output_dir = "./output/dino_maevitConvNext_base_4scale_
+train.output_dir = "./output/dino_maevitConvNext_base_4scale_12ep"
