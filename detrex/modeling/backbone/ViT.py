@@ -142,11 +142,6 @@ class Block(nn.Module):
             self.W = None
 
     def forward(self, x):
-        convert = False
-        if isinstance(x, torch.float16):
-            print("amp open")
-            x = x.float()
-            convert=True
         if isinstance(self.mlp, Mlp):
             x = x + self.drop_path(self.gamma1 * self.attn(self.norm1(x)))
             x = x + self.drop_path(self.gamma2 * self.mlp(self.norm2(x)))
@@ -157,8 +152,6 @@ class Block(nn.Module):
             x_new, _ = self.mlp(self.norm2(x), H, W)
             x = x + self.drop_path(self.gamma2 * x_new)
             self.H, self.W = H, W
-        if convert:
-            x = x.half()
         return x
 
 class BaseConv(nn.Module):
