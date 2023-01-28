@@ -9,7 +9,7 @@ def main():
     args = parser.parse_args()
     new_model = collections.OrderedDict()
 
-    model = torch.load(args.path)
+    model = torch.load(args.path)['state_dict']
 
     for key in model.keys():
         word = key.split('.')[1]
