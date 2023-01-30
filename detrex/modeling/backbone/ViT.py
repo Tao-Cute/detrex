@@ -447,7 +447,8 @@ class ViT(Backbone):
 
         self.out_index = out_index
         self.out_ids = out_ids
-        
+        self._out_feature_strides = {}
+        self._out_feature_channels = {}
         for i_layer in self.out_index:
             layer = nn.LayerNorm(self.out_channel[i_layer])
             layer_name = f'out_norm{i_layer}'
@@ -476,6 +477,7 @@ class ViT(Backbone):
             nn.init.constant_(m.weight, 1.0)
 
     def forward(self, x):
+        tmp = x
         if isinstance(self.patch_embed, HybridEmbed):
             x, (Hp, Wp), outputs = self.patch_embed(x, return_feat=True)
         else:
@@ -499,8 +501,9 @@ class ViT(Backbone):
                 norm_layer = getattr(self, f'out_norm{i}')
                 out = norm_layer(out)
                 final_results[f'p{i}'] = out.permute(0, 3, 1, 2).contiguous()
+        embed()
         return final_results
-
+    
 
 class MIMConvViT(ViT):
     def __init__(self, out_index=[0, 1, 2, 3], out_channel = [192, 384, 768, 768]):
@@ -509,7 +512,6 @@ class MIMConvViT(ViT):
         super(MIMConvViT, self).__init__(
             out_index=out_index, pos_embed=pos_embed, patch_embed=patch_embed, out_channel=out_channel
         )
-
 
 class MyConvViT(ViT):
     def __init__(self, out_index=[0, 1, 2, 3], out_channel = [128, 256, 768, 768]):
