@@ -449,10 +449,16 @@ class ViT(Backbone):
         self.out_ids = out_ids
         self._out_feature_strides = {}
         self._out_feature_channels = {}
+        self._out_features = []
+        stride_out = 4
         for i_layer in self.out_index:
             layer = nn.LayerNorm(self.out_channel[i_layer])
             layer_name = f'out_norm{i_layer}'
             self.add_module(layer_name, layer)
+            self._out_feature_channels[f"p{i_layer}"] = self.out_channel[i_layer]
+            self._out_feature_strides[f"p{i_layer}"] = stride_out
+            self._out_features.append(f"p{i_layer}")
+            stride_out *= 2
 
         self.add_module("learnable_downsample", nn.Conv2d(in_channels=embed_dim,
                                         out_channels=768,
@@ -477,7 +483,6 @@ class ViT(Backbone):
             nn.init.constant_(m.weight, 1.0)
 
     def forward(self, x):
-        tmp = x
         if isinstance(self.patch_embed, HybridEmbed):
             x, (Hp, Wp), outputs = self.patch_embed(x, return_feat=True)
         else:
@@ -501,7 +506,6 @@ class ViT(Backbone):
                 norm_layer = getattr(self, f'out_norm{i}')
                 out = norm_layer(out)
                 final_results[f'p{i}'] = out.permute(0, 3, 1, 2).contiguous()
-        embed()
         return final_results
     
 
