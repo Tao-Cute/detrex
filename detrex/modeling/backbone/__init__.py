@@ -33,3 +33,5 @@ from .fan import (
     fan_base_12_p4_hybrid,
     fan_large_12_p4_hybrid,
 )
+
+from .ViTDET import ConvNextWindowViT

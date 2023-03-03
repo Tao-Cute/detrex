@@ -24,10 +24,59 @@ from detectron2.modeling.backbone.utils import (
 import math
 from detrex.layers import LayerNorm
 from .convnext_utils import _create_hybrid_backbone
-from .fan import HybridEmbed
 from IPython import embed
 
 logger = logging.getLogger(__name__)
+
+class HybridEmbed(nn.Module):
+    """ CNN Feature Map Embedding
+    Extract feature map from CNN, flatten, project to embedding dim.
+    """
+    def __init__(self, backbone, img_size=224, patch_size=2, feature_size=None, in_chans=3, embed_dim=384):
+        super().__init__()
+        assert isinstance(backbone, nn.Module)
+        img_size = to_2tuple(img_size)
+        patch_size = to_2tuple(patch_size)
+        self.img_size = img_size
+        self.patch_size = patch_size
+        self.backbone = backbone
+        if feature_size is None:
+            with torch.no_grad():
+                # NOTE Most reliable way of determining output dims is to run forward pass
+                training = backbone.training
+                if training:
+                    backbone.eval()
+                o = self.backbone.forward_features(torch.zeros(1, in_chans, img_size[0], img_size[1]))
+                if isinstance(o, (list, tuple)):
+                    o = o[-1]  # last feature if backbone outputs list/tuple of features
+                feature_size = o.shape[-2:]
+                feature_dim = o.shape[1]
+                backbone.train(training)
+        else:
+            feature_size = to_2tuple(feature_size)
+            if hasattr(self.backbone, 'feature_info'):
+                feature_dim = self.backbone.feature_info.channels()[-1]
+            else:
+                feature_dim = self.backbone.num_features
+        assert feature_size[0] % patch_size[0] == 0 and feature_size[1] % patch_size[1] == 0
+        self.grid_size = (feature_size[0] // patch_size[0], feature_size[1] // patch_size[1])
+        self.num_patches = self.grid_size[0] * self.grid_size[1]
+        self.proj = nn.Conv2d(feature_dim, embed_dim, kernel_size=patch_size, stride=patch_size)
+        self.post_norm = LayerNorm(embed_dim)
+
+
+    def forward(self, x, return_feat=False):
+        x, out_list = self.backbone.forward_features(x, return_feat=return_feat)
+        B, C, H, W = x.shape
+        if isinstance(x, (list, tuple)):
+            x = x[-1]  # last feature if backbone outputs list/tuple of features
+        x = self.proj(x).flatten(2).transpose(1, 2)
+        x = self.post_norm(x)
+        if return_feat:
+            return x , (H//self.patch_size[0], W//self.patch_size[1]), out_list
+        else:
+            return x , (H//self.patch_size[0], W//self.patch_size[1])
+
 
 class ConvMlp(nn.Module):
     """ MLP using 1x1 convs that keeps spatial dims
@@ -123,7 +172,7 @@ class ChannelProcessing(nn.Module):
 class Block(nn.Module):
 
     def __init__(self, dim, num_heads, mlp_ratio=4., qkv_bias=False, drop=0., attn_drop=0.,
-                 drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, init_values=1e-4, channel_process="mlp", mlp="fc"):
+                 drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, init_values=None, channel_process="mlp", mlp="fc"):
         super().__init__()
         self.norm1 = norm_layer(dim)
         self.attn = Attention(dim, num_heads=num_heads, qkv_bias=qkv_bias, attn_drop=attn_drop, proj_drop=drop)
@@ -131,8 +180,10 @@ class Block(nn.Module):
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
         self.norm2 = norm_layer(dim)
         mlp_hidden_dim = int(dim * mlp_ratio)
-        self.gamma1 = nn.Parameter(init_values * torch.ones(dim), requires_grad=True)
-        self.gamma2 = nn.Parameter(init_values * torch.ones(dim), requires_grad=True)
+        self.layer_scale = init_values is None
+        if layer_scale is not None:
+            self.gamma1 = nn.Parameter(init_values * torch.ones(dim), requires_grad=True) 
+            self.gamma2 = nn.Parameter(init_values * torch.ones(dim), requires_grad=True) 
         if channel_process=="mlp":
             self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer, drop=drop)
         elif channel_process=="cp":
@@ -143,8 +194,12 @@ class Block(nn.Module):
 
     def forward(self, x):
         if isinstance(self.mlp, Mlp):
-            x = x + self.drop_path(self.gamma1 * self.attn(self.norm1(x)))
-            x = x + self.drop_path(self.gamma2 * self.mlp(self.norm2(x)))
+            if self.layer_scale:
+                x = x + self.drop_path(self.gamma1 * self.attn(self.norm1(x)))
+                x = x + self.drop_path(self.gamma2 * self.mlp(self.norm2(x)))
+            else:
+                x = x + self.drop_path(self.attn(self.norm1(x)))
+                x = x + self.drop_path(self.mlp(self.norm2(x)))
         elif isinstance(self.mlp, ChannelProcessing):
             H, W = self.H, self.W
             x_new = self.attn(self.norm1(x))
@@ -236,56 +291,6 @@ class ConvStem(nn.Module):
         x = x.flatten(2).transpose(1, 2)
         
         return outputs, x, (H, W)
-
-class TokenMixing(nn.Module):
-    def __init__(self, dim, num_heads=8, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0.):
-        super().__init__()
-        assert dim % num_heads == 0, f"dim {dim} should be divided by num_heads {num_heads}."
-
-        self.dim = dim
-        self.num_heads = num_heads
-        head_dim = dim // num_heads
-        self.scale = qk_scale or head_dim ** -0.5
-
-        cha_sr = 1
-        self.q = nn.Linear(dim, dim // cha_sr, bias=qkv_bias)
-        self.kv = nn.Linear(dim, dim * 2 // cha_sr, bias=qkv_bias)
-        self.attn_drop = nn.Dropout(attn_drop)
-        self.proj = nn.Linear(dim, dim)
-        self.proj_drop = nn.Dropout(proj_drop)
-        self.apply(self._init_weights)
-
-    def _init_weights(self, m):
-        if isinstance(m, nn.Linear):
-            trunc_normal_(m.weight, std=.02)
-            if isinstance(m, nn.Linear) and m.bias is not None:
-                nn.init.constant_(m.bias, 0)
-        elif isinstance(m, nn.LayerNorm):
-            nn.init.constant_(m.bias, 0)
-            nn.init.constant_(m.weight, 1.0)
-        elif isinstance(m, nn.Conv2d):
-            fan_out = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
-            fan_out //= m.groups
-            m.weight.data.normal_(0, math.sqrt(2.0 / fan_out))
-            if m.bias is not None:
-                m.bias.data.zero_()
-
-    def forward(self, x):
-        B, N, C = x.shape
-        q = self.q(x).reshape(B, N, self.num_heads, C // self.num_heads).permute(0, 2, 1, 3)
-        kv = self.kv(x).reshape(B, -1, 2, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
-
-        k, v = kv[0], kv[1]
-        attn = (q * self.scale @ k.transpose(-2, -1)) #* self.scale
-        attn = attn.softmax(dim=-1)
-        attn = self.attn_drop(attn)
-
-        x = (attn @ v).transpose(1, 2).reshape(B, N, C)
-
-        x = self.proj(x)
-        x = self.proj_drop(x)
-
-        return x, attn
 
 
 class MIMConvStem(nn.Module):
