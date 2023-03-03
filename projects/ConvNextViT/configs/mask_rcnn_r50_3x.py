@@ -20,9 +20,9 @@ model.input_format = "RGB"
 
 # Initialization and trainer settings
 train = model_zoo.get_config("common/train.py").train
-train.amp.enabled = True
-train.ddp.fp16_compression = True
-train.init_checkpoint = "model_zoo/pretrain/R-50.pkl"
+train.amp.enabled = False
+train.ddp.fp16_compression = False
+train.init_checkpoint = "detectron2://ImageNetPretrained/MSRA/R-50.pkl"
 
 dataloader.train.total_batch_size = 16
 

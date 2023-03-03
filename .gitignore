@@ -133,3 +133,5 @@ dmypy.json
 /datasets
 output/
 /model_zoo
+/train.sh
+/trainCascade.sh

@@ -11,3 +11,6 @@ model.backbone = L(FPN)(
     out_channels=256,
     top_block=L(LastLevelMaxPool)(),
 )
+train.init_checkpoint = "model_zoo/vit828.ckpt"
+optimizer.lr = 0.0001
+train.output_dir = "./output/cascade_convvit828exp1"
