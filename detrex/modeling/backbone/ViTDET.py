@@ -85,33 +85,64 @@ class HybridEmbed(nn.Module):
 
 
 
+
 class Attention(nn.Module):
-    def __init__(self, dim, num_heads=8, qkv_bias=False,
-                 attn_drop=0., proj_drop=0.):
+    """Multi-head Attention block with relative position embeddings."""
+
+    def __init__(
+        self,
+        dim,
+        num_heads=8,
+        qkv_bias=True,
+        use_rel_pos=False,
+        rel_pos_zero_init=True,
+        input_size=None,
+    ):
+        """
+        Args:
+            dim (int): Number of input channels.
+            num_heads (int): Number of attention heads.
+            qkv_bias (bool:  If True, add a learnable bias to query, key, value.
+            rel_pos (bool): If True, add relative positional embeddings to the attention map.
+            rel_pos_zero_init (bool): If True, zero initialize relative positional parameters.
+            input_size (int or None): Input resolution for calculating the relative positional
+                parameter size.
+        """
         super().__init__()
         self.num_heads = num_heads
         head_dim = dim // num_heads
         self.scale = head_dim**-0.5
 
         self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
-        self.attn_drop = nn.Dropout(attn_drop)
         self.proj = nn.Linear(dim, dim)
-        self.proj_drop = nn.Dropout(proj_drop)
 
-    def forward(self, x, H, W):
-        B, N, C = x.shape
-        qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
-        q, k, v = qkv.unbind(0)  # make torchscript happy (cannot use tensor as tuple)
+        self.use_rel_pos = use_rel_pos
+        if self.use_rel_pos:
+            # initialize relative positional embeddings
+            self.rel_pos_h = nn.Parameter(torch.zeros(2 * input_size[0] - 1, head_dim))
+            self.rel_pos_w = nn.Parameter(torch.zeros(2 * input_size[1] - 1, head_dim))
 
-        attn = (q @ k.transpose(-2, -1)) * self.scale
+            if not rel_pos_zero_init:
+                nn.init.trunc_normal_(self.rel_pos_h, std=0.02)
+                nn.init.trunc_normal_(self.rel_pos_w, std=0.02)
+
+    def forward(self, x):
+        B, H, W, _ = x.shape
+        # qkv with shape (3, B, nHead, H * W, C)
+        qkv = self.qkv(x).reshape(B, H * W, 3, self.num_heads, -1).permute(2, 0, 3, 1, 4)
+        # q, k, v with shape (B * nHead, H * W, C)
+        q, k, v = qkv.reshape(3, B * self.num_heads, H * W, -1).unbind(0)
+
+        attn = (q * self.scale) @ k.transpose(-2, -1)
+
+        if self.use_rel_pos:
+            attn = add_decomposed_rel_pos(attn, q, self.rel_pos_h, self.rel_pos_w, (H, W), (H, W))
+
         attn = attn.softmax(dim=-1)
-        attn = self.attn_drop(attn)
-
-        x = (attn @ v).transpose(1, 2).reshape(B, N, C)
+        x = (attn @ v).view(B, self.num_heads, H, W, -1).permute(0, 2, 3, 1, 4).reshape(B, H, W, -1)
         x = self.proj(x)
-        x = self.proj_drop(x)
-        return x
 
+        return x
 
 def window_partition(x, window_size):
     """
@@ -272,66 +303,91 @@ class ResBottleneckBlock(nn.Module):
 
 
 class Block(nn.Module):
-    def __init__(self, dim, num_heads, mlp_ratio=4., qkv_bias=False, drop=0., with_cp=False,
-                 attn_drop=0., drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm,
-                 windowed=False, window_size=14, use_residual=False, layer_scale=False):
+    """Transformer blocks with support of window attention and residual propagation blocks"""
+
+    def __init__(
+        self,
+        dim,
+        num_heads,
+        mlp_ratio=4.0,
+        qkv_bias=True,
+        drop_path=0.0,
+        norm_layer=nn.LayerNorm,
+        act_layer=nn.GELU,
+        use_rel_pos=False,
+        rel_pos_zero_init=True,
+        window_size=0,
+        use_residual_block=False,
+        input_size=None,
+    ):
+        """
+        Args:
+            dim (int): Number of input channels.
+            num_heads (int): Number of attention heads in each ViT block.
+            mlp_ratio (float): Ratio of mlp hidden dim to embedding dim.
+            qkv_bias (bool): If True, add a learnable bias to query, key, value.
+            drop_path (float): Stochastic depth rate.
+            norm_layer (nn.Module): Normalization layer.
+            act_layer (nn.Module): Activation layer.
+            use_rel_pos (bool): If True, add relative positional embeddings to the attention map.
+            rel_pos_zero_init (bool): If True, zero initialize relative positional parameters.
+            window_size (int): Window size for window attention blocks. If it equals 0, then not
+                use window attention.
+            use_residual_block (bool): If True, use a residual block after the MLP block.
+            input_size (int or None): Input resolution for calculating the relative positional
+                parameter size.
+        """
         super().__init__()
-        self.with_cp = with_cp
-        self.use_residual = use_residual
         self.norm1 = norm_layer(dim)
-        if windowed:
-            self.attn = WindowedAttention(dim, num_heads=num_heads,
-                                          qkv_bias=qkv_bias, attn_drop=attn_drop,
-                                          proj_drop=drop, window_size=window_size)
-        else:
-            self.attn = Attention(dim, num_heads=num_heads, qkv_bias=qkv_bias,
-                                  attn_drop=attn_drop, proj_drop=drop)
-        # NOTE: drop path for stochastic depth, we shall see if this is better than dropout here
-        self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
+        self.attn = Attention(
+            dim,
+            num_heads=num_heads,
+            qkv_bias=qkv_bias,
+            use_rel_pos=use_rel_pos,
+            rel_pos_zero_init=rel_pos_zero_init,
+            input_size=input_size if window_size == 0 else (window_size, window_size),
+        )
+
+        from timm.models.layers import DropPath, Mlp
+
+        self.drop_path = DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
         self.norm2 = norm_layer(dim)
-        mlp_hidden_dim = int(dim * mlp_ratio)
-        self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim,
-                       act_layer=act_layer, drop=drop)
-        self.layer_scale = layer_scale
-        if layer_scale:
-            self.gamma1 = nn.Parameter(torch.ones((dim)), requires_grad=True)
-            self.gamma2 = nn.Parameter(torch.ones((dim)), requires_grad=True)
-            
-        if self.use_residual:
+        self.mlp = Mlp(in_features=dim, hidden_features=int(dim * mlp_ratio), act_layer=act_layer)
+
+        self.window_size = window_size
+
+        self.use_residual_block = use_residual_block
+        if use_residual_block:
             # Use a residual block with bottleneck channel as dim // 2
             self.residual = ResBottleneckBlock(
                 in_channels=dim,
                 out_channels=dim,
                 bottleneck_channels=dim // 2,
-                norm=LayerNorm,
+                norm="LN",
                 act_layer=act_layer,
             )
-            
-    def forward(self, x, H, W):
-        
-        def _inner_forward(x):
-            if self.layer_scale:
-                x = x + self.drop_path(self.gamma1 * self.attn(self.norm1(x), H, W))
-                x = x + self.drop_path(self.gamma2 * self.mlp(self.norm2(x)))
-            else:
-                x = x + self.drop_path(self.attn(self.norm1(x), H, W))
-                x = x + self.drop_path(self.mlp(self.norm2(x)))
-                
-            if self.use_residual:
-                B, N, C = x.shape
-                x = x.reshape(B, H, W, C).permute(0, 3, 1, 2)
-                x = self.residual(x)
-                x = x.permute(0, 2, 3, 1).reshape(B, N, C)
-                
-            return x
 
-        if self.with_cp and x.requires_grad:
-            x = cp.checkpoint(_inner_forward, x)
-        else:
-            x = _inner_forward(x)
-        
+    def forward(self, x):
+        shortcut = x
+        x = self.norm1(x)
+        # Window partition
+        if self.window_size > 0:
+            H, W = x.shape[1], x.shape[2]
+            x, pad_hw = window_partition(x, self.window_size)
+
+        x = self.attn(x)
+        # Reverse window partition
+        if self.window_size > 0:
+            x = window_unpartition(x, self.window_size, pad_hw, (H, W))
+
+        x = shortcut + self.drop_path(x)
+        x = x + self.drop_path(self.mlp(self.norm2(x)))
+
+        if self.use_residual_block:
+            x = self.residual(x.permute(0, 3, 1, 2)).permute(0, 2, 3, 1)
+
         return x
-
+                                         
 
 class ViT(Backbone):
 
@@ -360,7 +416,6 @@ class ViT(Backbone):
         out_channel=[128, 256, 768, 768],
         out_ids=11,
         patch_embed="ConvNext",
-        pos_embed="abs_pos",
         out_index = [0, 1, 2, 3],
     ):
         """
@@ -408,7 +463,7 @@ class ViT(Backbone):
             backbone = _create_hybrid_backbone(pretrained=False, pretrained_strict=False, **model_args)
             self.patch_embed = HybridEmbed(backbone=backbone, patch_size=2, embed_dim=embed_dim)
 
-        if pos_embed == "abs_pos":
+        if use_abs_pos:
             # Initialize absolute positional embedding with pretrain image size.
             num_patches = (pretrain_img_size // patch_size) * (pretrain_img_size // patch_size)
             num_positions = (num_patches + 1) if pretrain_use_cls_token else num_patches
@@ -428,8 +483,17 @@ class ViT(Backbone):
                 qkv_bias=qkv_bias,
                 drop_path=dpr[i],
                 norm_layer=norm_layer,
+                act_layer=act_layer,
+                use_rel_pos=use_rel_pos,
+                rel_pos_zero_init=rel_pos_zero_init,
+                window_size=window_size if i in window_block_indexes else 0,
+                use_residual_block=i in residual_block_indexes,
+                input_size=(img_size // patch_size, img_size // patch_size),
             )
             if use_act_checkpoint:
+                # TODO: use torch.utils.checkpoint
+                from fairscale.nn.checkpoint import checkpoint_wrapper
+
                 block = checkpoint_wrapper(block)
             self.blocks.append(block)
 
@@ -438,6 +502,7 @@ class ViT(Backbone):
         self._out_feature_strides = {}
         self._out_feature_channels = {}
         self._out_features = []
+
         stride_out = 4
         for i_layer in self.out_index:
             layer = nn.LayerNorm(self.out_channel[i_layer])
@@ -500,7 +565,6 @@ class ViT(Backbone):
 class ConvNextWindowViT(ViT):
     def __init__(self, out_index=[0, 1, 2, 3], out_channel = [128, 256, 768, 768]):
         model_args = dict(
-            pos_embed = "abs_pos", 
             patch_embed = "ConvNext",
             out_index=out_index, 
             out_channel=out_channel,
