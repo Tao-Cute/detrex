@@ -29,8 +29,11 @@ from detectron2.modeling.backbone.utils import (
     PatchEmbed,
     add_decomposed_rel_pos,
     get_abs_pos,
+    window_partition,
+    window_unpartition,
+
 )
-from .convnext_utils import _create_hybrid_backbone
+from convnext_utils import _create_hybrid_backbone
 
 
 class HybridEmbed(nn.Module):
@@ -76,7 +79,7 @@ class HybridEmbed(nn.Module):
         if isinstance(x, (list, tuple)):
             x = x[-1]  # last feature if backbone outputs list/tuple of features
         x = self.proj(x)
-        x = self.post_norm(x).flatten(2).transpose(1, 2)
+        x = self.post_norm(x).permute(0, 2, 3, 1)
         if return_feat:
             return x , (H//self.patch_size[0], W//self.patch_size[1]), out_list
         else:
@@ -144,81 +147,7 @@ class Attention(nn.Module):
 
         return x
 
-def window_partition(x, window_size):
-    """
-    Args:
-        x: (B, H, W, C)
-        window_size (int): window size
-    Returns:
-        windows: (num_windows*B, window_size, window_size, C)
-    """
-    B, H, W, C = x.shape
-    x = x.view(B, H // window_size, window_size, W // window_size, window_size, C)
-    windows = x.permute(0, 1, 3, 2, 4, 5).contiguous().view(-1, window_size, window_size, C)
-    return windows
 
-
-def window_reverse(windows, window_size, H, W):
-    """
-    Args:
-        windows: (num_windows*B, window_size, window_size, C)
-        window_size (int): Window size
-        H (int): Height of image
-        W (int): Width of image
-    Returns:
-        x: (B, H, W, C)
-    """
-    B = int(windows.shape[0] / (H * W / window_size / window_size))
-    x = windows.view(B, H // window_size, W // window_size, window_size, window_size, -1)
-    x = x.permute(0, 1, 3, 2, 4, 5).contiguous().view(B, H, W, -1)
-    return x
-
-
-class WindowedAttention(nn.Module):
-    def __init__(self, dim, num_heads=8, qkv_bias=False, attn_drop=0.,
-                 proj_drop=0., window_size=14):
-        super().__init__()
-        self.num_heads = num_heads
-        head_dim = dim // num_heads
-        self.scale = head_dim**-0.5
-
-        self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
-        self.attn_drop = nn.Dropout(attn_drop)
-        self.proj = nn.Linear(dim, dim)
-        self.proj_drop = nn.Dropout(proj_drop)
-        self.window_size = window_size
-
-    def forward(self, x, H, W):
-        B, N, C = x.shape
-        N_ = self.window_size * self.window_size
-        H_ = math.ceil(H / self.window_size) * self.window_size
-        W_ = math.ceil(W / self.window_size) * self.window_size
-
-        qkv = self.qkv(x)  # [B, N, C]
-        qkv = qkv.transpose(1, 2).reshape(B, C * 3, H, W)  # [B, C, H, W]
-        qkv = F.pad(qkv, [0, W_ - W, 0, H_ - H], mode='constant')
-
-        qkv = F.unfold(qkv, kernel_size=(self.window_size, self.window_size),
-                       stride=(self.window_size, self.window_size))
-        B, C_kw_kw, L = qkv.shape  # L - the num of windows
-        qkv = qkv.reshape(B, C * 3, N_, L).permute(0, 3, 2, 1)  # [B, L, N_, C]
-        qkv = qkv.reshape(B, L, N_, 3, self.num_heads, C // self.num_heads).permute(3, 0, 1, 4, 2, 5)
-        q, k, v = qkv.unbind(0)  # make torchscript happy (cannot use tensor as tuple)
-
-        # q,k,v [B, L, num_head, N_, C/num_head]
-        attn = (q @ k.transpose(-2, -1)) * self.scale  # [B, L, num_head, N_, N_]
-        attn = attn.softmax(dim=-1)
-        attn = self.attn_drop(attn)  # [B, L, num_head, N_, N_]
-        # attn @ v = [B, L, num_head, N_, C/num_head]
-        x = (attn @ v).permute(0, 2, 4, 3, 1).reshape(B, C_kw_kw // 3, L)
-
-        x = F.fold(x, output_size=(H_, W_),
-                   kernel_size=(self.window_size, self.window_size),
-                   stride=(self.window_size, self.window_size))  # [B, C, H_, W_]
-        x = x[:, :, :H, :W].reshape(B, C, N).transpose(-1, -2)
-        x = self.proj(x)
-        x = self.proj_drop(x)
-        return x
 
 class LayerNorm(nn.Module):
     """
@@ -544,7 +473,8 @@ class ViT(Backbone):
         if self.pos_embed is not None:
             pos_embed = get_abs_pos(
                 self.pos_embed, self.pretrain_use_cls_token, (Hp, Wp)
-            ).permute(0, 3, 1, 2).flatten(2).transpose(1, 2)
+            )
+
             x = x + pos_embed
         for i, blk in enumerate(self.blocks):
             x = blk(x)
