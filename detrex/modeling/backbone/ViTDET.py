@@ -33,7 +33,7 @@ from detectron2.modeling.backbone.utils import (
     window_unpartition,
 
 )
-from convnext_utils import _create_hybrid_backbone
+from .convnext_utils import _create_hybrid_backbone
 
 
 class HybridEmbed(nn.Module):
