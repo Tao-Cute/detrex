@@ -547,7 +547,7 @@ class ViT(Backbone):
             ).permute(0, 3, 1, 2).flatten(2).transpose(1, 2)
             x = x + pos_embed
         for i, blk in enumerate(self.blocks):
-            x = blk(x, Hp, Wp)
+            x = blk(x)
             if i == self.out_ids:
                 outputs.append(x.reshape(B, Hp, Wp, -1).permute(0, 3, 1, 2).contiguous())
         outputs.append(self.learnable_downsample(x.reshape(B, Hp, Wp, -1).permute(0, 3, 1, 2).contiguous()))
