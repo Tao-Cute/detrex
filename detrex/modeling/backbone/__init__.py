@@ -26,7 +26,7 @@ from .resnet import (
 )
 from .convnext import ConvNeXt
 from .focalnet import FocalNet
-from .ViT import MyConvViT, MIMConvViT, ConvNextViT
+from .ViT import MyConvViT, MIMConvViT, ConvNextViT, ViTDrop
 from .fan import (
     fan_tiny_8_p4_hybrid,
     fan_small_12_p4_hybrid,

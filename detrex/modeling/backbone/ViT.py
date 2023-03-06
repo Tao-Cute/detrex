@@ -180,8 +180,8 @@ class Block(nn.Module):
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
         self.norm2 = norm_layer(dim)
         mlp_hidden_dim = int(dim * mlp_ratio)
-        self.layer_scale = init_values is None
-        if layer_scale is not None:
+        self.layer_scale = init_values
+        if self.layer_scale is not None:
             self.gamma1 = nn.Parameter(init_values * torch.ones(dim), requires_grad=True) 
             self.gamma2 = nn.Parameter(init_values * torch.ones(dim), requires_grad=True) 
         if channel_process=="mlp":
@@ -538,9 +538,21 @@ class ConvNextViT(ViT):
             out_index=out_index, pos_embed=pos_embed, patch_embed=patch_embed, out_channel=out_channel
         )
 
+class ViTDrop(ViT):
+    def __init__(self, out_index=[0, 1, 2, 3], out_channel = [128, 256, 768, 768], drop_block=None):
+        pos_embed = "abs_pos"
+        patch_embed = "ConvNext"
+        super(ViTDrop, self).__init__(
+            out_index=out_index, pos_embed=pos_embed, patch_embed=patch_embed, out_channel=out_channel
+        )
+
+        if drop_block is not None:
+            for i in drop_block:
+                self.blocks[i] = nn.Identity()
+
 if __name__ == "__main__":
-    model = ConvNextViT([1, 2, 3])
+    model = ViTDrop(drop_block=[0, 1, 2])
     x = torch.randn(3, 3, 224, 224)
     x = model(x)
     for key, value in x.items():
-        print(value.shape)
+        print(key, value.shape)
