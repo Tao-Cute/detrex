@@ -160,10 +160,8 @@ def do_train(args, cfg):
     logger = logging.getLogger("detectron2")
     logger.info("Model:\n{}".format(model))
     model.to(cfg.train.device)
-    from IPython import embed; embed()
     cfg.optimizer.params.model = model
     optim = instantiate(cfg.optimizer)
-
     train_loader = instantiate(cfg.dataloader.train)
 
     model = create_ddp_model(model, **cfg.train.ddp)
