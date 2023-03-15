@@ -493,7 +493,7 @@ class ViT(Backbone):
 
 
 class ConvNextWindowViT(ViT):
-    def __init__(self, out_index=[0, 1, 2, 3], out_channel = [128, 256, 768, 768]):
+    def __init__(self, out_index=[0, 1, 2, 3], out_channel = [128, 256, 768, 768], convnext_pt=False):
         model_args = dict(
             patch_embed = "ConvNext",
             out_index=out_index, 
@@ -516,6 +516,10 @@ class ConvNextWindowViT(ViT):
         super(ConvNextWindowViT, self).__init__(
            **model_args
         )
+        if convnext_pt is True:
+            model_args = dict(depths=[3, 3], dims=[128, 256, 512, 1024], use_head=False)
+            backbone = _create_hybrid_backbone(pretrained=True, pretrained_strict=False, **model_args)
+            self.patch_embed = HybridEmbed(backbone=backbone, patch_size=2, embed_dim=768)
 
 if __name__ == "__main__":
     model = ConvNextWindowViT()
