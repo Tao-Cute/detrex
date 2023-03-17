@@ -15,7 +15,7 @@ model.backbone = L(FPN)(
     top_block=L(LastLevelMaxPool)(),
 )
 train.init_checkpoint = "model_zoo/ViTDrop.ckpt"
-train.output_dir = "./output/maskrcnn_ViTDrop0-3_1x_noWindow"
+train.output_dir = "./output/maskrcnn_ViTDrop1x"
 
 optimizer.lr = 0.0001
 optimizer.weight_decay = 0.1
