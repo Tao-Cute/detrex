@@ -33,8 +33,22 @@ from detectron2.modeling.backbone.utils import (
     window_unpartition,
 
 )
-from .convnext_utils import _create_hybrid_backbone
+from .convnext_utils import _create_hybrid_backbone, ConvNeXtBlock
 
+# class learnableDownsample(nn.Moduel):
+#     def __init__(self, in_dim, out_dim):
+#         super().__init__()
+#         LayerNorm(in_dim)
+#         self.proj = nn.Conv2d(in_channels=embed_dim,
+#                                         out_channels=768,
+#                                         kernel_size=3,
+#                                         stride=2,
+#                                         padding=1,
+#                                         dilation=1,
+#                                         groups=1, bias=True)
+
+#         self.down_sample = ConvNeXtBlock()
+        
 
 class HybridEmbed(nn.Module):
     """ CNN Feature Map Embedding
@@ -478,9 +492,8 @@ class ViT(Backbone):
             x = x + pos_embed
         for i, blk in enumerate(self.blocks):
             x = blk(x)
-            if i == self.out_ids:
-                outputs.append(x.reshape(B, Hp, Wp, -1).permute(0, 3, 1, 2).contiguous())
-        outputs.append(self.learnable_downsample(x.reshape(B, Hp, Wp, -1).permute(0, 3, 1, 2).contiguous()))
+        outputs.append(x.permute(0, 3, 1, 2).contiguous())
+        outputs.append(self.learnable_downsample(x.permute(0, 3, 1, 2).contiguous()))
         final_results = {}
 
         for i, out in enumerate(outputs):
@@ -520,6 +533,37 @@ class ConvNextWindowViT(ViT):
             model_args = dict(depths=[3, 3], dims=[128, 256, 512, 1024], use_head=False)
             backbone = _create_hybrid_backbone(pretrained=True, pretrained_strict=False, **model_args)
             self.patch_embed = HybridEmbed(backbone=backbone, patch_size=2, embed_dim=768)
+
+class ConvNextWindowDropViT(ViT):
+    def __init__(self, out_index=[0, 1, 2, 3], out_channel = [128, 256, 768, 768], convnext_pt=False, drop_block=None):
+        model_args = dict(
+            patch_embed = "ConvNext",
+            out_index=out_index, 
+            out_channel=out_channel,
+            window_size=14,
+            window_block_indexes=[
+            # 2, 5, 8 11 for global attention
+            3,
+            4,
+            6,
+            7,
+            9,
+            10,
+        ],
+        residual_block_indexes=[],
+        use_rel_pos=True,
+        )
+        super(ConvNextWindowDropViT, self).__init__(
+           **model_args
+        )
+        if convnext_pt is True:
+            model_args = dict(depths=[3, 3], dims=[128, 256, 512, 1024], use_head=False)
+            backbone = _create_hybrid_backbone(pretrained=True, pretrained_strict=False, **model_args)
+            self.patch_embed = HybridEmbed(backbone=backbone, patch_size=2, embed_dim=768)
+        
+        if drop_block is not None:
+            for i in drop_block:
+                self.blocks[i] = nn.Identity()
 
 if __name__ == "__main__":
     model = ConvNextWindowViT()

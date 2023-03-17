@@ -351,7 +351,7 @@ def checkpoint_filter_fn(state_dict, model):
     return out_dict
 
 
-def _create_hybrid_backbone(variant='convnext_base_in22k', pretrained=False, **kwargs):
+def _create_hybrid_backbone(variant='convnext_base', pretrained=False, **kwargs):
     model = build_model_with_cfg(
         ConvNeXt, variant, pretrained,
         # default_cfg=default_cfgs[variant],
