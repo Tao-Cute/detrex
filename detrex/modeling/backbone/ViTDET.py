@@ -506,16 +506,14 @@ class ViT(Backbone):
 
 
 class ConvNextWindowViT(ViT):
-    def __init__(self, out_index=[0, 1, 2, 3], out_channel = [128, 256, 768, 768], convnext_pt=False):
+    def __init__(self, out_index=[0, 1, 2, 3], out_channel = [128, 256, 768, 768], convnext_pt=False, drop_block=None, window_size=14):
         model_args = dict(
             patch_embed = "ConvNext",
             out_index=out_index, 
             out_channel=out_channel,
-            window_size=14,
+            window_size=window_size,
             window_block_indexes=[
             # 2, 5, 8 11 for global attention
-            0,
-            1,
             3,
             4,
             6,
@@ -527,33 +525,6 @@ class ConvNextWindowViT(ViT):
         use_rel_pos=True,
         )
         super(ConvNextWindowViT, self).__init__(
-           **model_args
-        )
-        if convnext_pt is True:
-            model_args = dict(depths=[3, 3], dims=[128, 256, 512, 1024], use_head=False)
-            backbone = _create_hybrid_backbone(pretrained=True, pretrained_strict=False, **model_args)
-            self.patch_embed = HybridEmbed(backbone=backbone, patch_size=2, embed_dim=768)
-
-class ConvNextWindowDropViT(ViT):
-    def __init__(self, out_index=[0, 1, 2, 3], out_channel = [128, 256, 768, 768], convnext_pt=False, drop_block=None):
-        model_args = dict(
-            patch_embed = "ConvNext",
-            out_index=out_index, 
-            out_channel=out_channel,
-            window_size=14,
-            window_block_indexes=[
-            # 2, 5, 8 11 for global attention
-            3,
-            4,
-            6,
-            7,
-            9,
-            10,
-        ],
-        residual_block_indexes=[],
-        use_rel_pos=True,
-        )
-        super(ConvNextWindowDropViT, self).__init__(
            **model_args
         )
         if convnext_pt is True:
