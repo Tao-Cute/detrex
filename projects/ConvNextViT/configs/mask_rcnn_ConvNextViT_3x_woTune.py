@@ -17,5 +17,5 @@ train.init_checkpoint = "model_zoo/deit_base_patch16_224.pth"
 train.output_dir = "./output/Deit_Base"
 
 optimizer.lr = 0.0001
-optimizer.weight_decay = 0.05
+optimizer.weight_decay = 0.1
 optimizer.params.overrides = {"pos_embed": {"weight_decay": 0.0}}

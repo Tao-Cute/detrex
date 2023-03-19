@@ -417,6 +417,27 @@ class ViT(Backbone):
         # stochastic depth decay rule
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, depth)]
 
+        self.window_size = []
+        if isinstance(window_size, int):
+            for i in range(depth):
+                if i in window_block_indexes:
+                    self.window_size.append(window_size)
+                else:
+                    self.window_size.append(0)
+        elif len(window_size) > 1:
+            assert len(window_size) == len(window_block_indexes)
+            index = 0
+            for i in range(depth):
+                if i in window_block_indexes:
+                    self.window_size.append(window_size[index])
+                    index += 1
+                else:
+                    self.window_size.append(0)
+        
+        else:
+            raise NotImplementedError(
+                f"window_size size type {type(window_size)} is not supported"
+            )
         self.blocks = nn.ModuleList()
         for i in range(depth):
             block = Block(
@@ -429,7 +450,7 @@ class ViT(Backbone):
                 act_layer=act_layer,
                 use_rel_pos=use_rel_pos,
                 rel_pos_zero_init=rel_pos_zero_init,
-                window_size=window_size if i in window_block_indexes else 0,
+                window_size=self.window_size[i],
                 use_residual_block=i in residual_block_indexes,
                 input_size=(img_size // patch_size, img_size // patch_size),
             )
@@ -506,21 +527,18 @@ class ViT(Backbone):
 
 
 class ConvNextWindowViT(ViT):
-    def __init__(self, out_index=[0, 1, 2, 3], out_channel = [128, 256, 768, 768], convnext_pt=False, drop_block=None, window_size=14):
+    def __init__(
+        self, out_index=[0, 1, 2, 3], out_channel = [128, 256, 768, 768], 
+        convnext_pt=False, 
+        drop_block=None, 
+        window_size=14, 
+        window_block_indexes=[3,4,6,7,9,10]):
         model_args = dict(
             patch_embed = "ConvNext",
             out_index=out_index, 
             out_channel=out_channel,
             window_size=window_size,
-            window_block_indexes=[
-            # 2, 5, 8 11 for global attention
-            3,
-            4,
-            6,
-            7,
-            9,
-            10,
-        ],
+            window_block_indexes=window_block_indexes,
         residual_block_indexes=[],
         use_rel_pos=True,
         )

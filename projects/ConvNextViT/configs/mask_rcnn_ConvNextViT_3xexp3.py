@@ -14,5 +14,5 @@ train.init_checkpoint = "model_zoo/vit828.ckpt"
 train.output_dir = "./output/maskrcnn_convvit828exp3"
 
 optimizer.lr = 0.0001
-optimizer.weight_decay = 0.05
+optimizer.weight_decay = 0.1
 optimizer.params.overrides = {"pos_embed": {"weight_decay": 0.0}}

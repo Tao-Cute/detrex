@@ -8,13 +8,15 @@ from fvcore.common.param_scheduler import MultiStepParamScheduler
 from detectron2.solver import WarmupParamScheduler
 
 model.backbone = L(FPN)(
-    bottom_up=L(ConvNextWindowViT)(),
+    bottom_up=L(ConvNextWindowViT)(drop_block=[0, 1, 2], 
+                                   window_size=[7, 7, 14, 14, 28, 28],
+                                   window_block_indexes=[3, 4, 5, 6, 7, 8]),
     in_features=["p0", "p1", "p2", "p3"],
     out_channels=256,
     top_block=L(LastLevelMaxPool)(),
 )
-train.init_checkpoint = "model_zoo/vit828.ckpt"
-train.output_dir = "./output/maskrcnn_convvit8281x"
+train.init_checkpoint = "model_zoo/ViTDrop.ckpt"
+train.output_dir = "./output/MaskRCNN_Drop03_1x_WS7to28_EXP2"
 
 optimizer.lr = 0.0001
 optimizer.weight_decay = 0.1
