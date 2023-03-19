@@ -14,7 +14,9 @@ model.backbone = L(FPN)(
     top_block=L(LastLevelMaxPool)(),
 )
 train.init_checkpoint = "model_zoo/deit_base_patch16_224.pth"
-train.output_dir = "./output/Deit_Base_1x_Drop"
+root_path = './output/MaskRCNN/'
+file_name = root_path + 'EXP' + str(len(os.listdir(root_path)) + 1)
+train.output_dir = file_name
 
 optimizer.lr = 0.0001
 optimizer.weight_decay = 0.1

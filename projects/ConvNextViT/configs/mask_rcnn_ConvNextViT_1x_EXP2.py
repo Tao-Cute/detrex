@@ -14,7 +14,10 @@ model.backbone = L(FPN)(
     top_block=L(LastLevelMaxPool)(),
 )
 train.init_checkpoint = "model_zoo/vit828.ckpt"
-train.output_dir = "./output/maskrcnn_convvit8281x_EXP2"
+root_path = './output/MaskRCNN/'
+file_name = root_path + 'EXP' + str(len(os.listdir(root_path)) + 1)
+train.output_dir = file_name
+
 
 optimizer.lr = 0.0001
 optimizer.weight_decay = 0.1
