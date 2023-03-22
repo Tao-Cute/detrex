@@ -4,7 +4,6 @@ from detectron2.modeling.backbone import FPN
 from detrex.modeling.backbone import MyConvViT, MIMConvViT, ConvNextViT, ConvNextWindowViT
 from detectron2.modeling.backbone.fpn import LastLevelMaxPool
 import os
-
 from fvcore.common.param_scheduler import MultiStepParamScheduler
 from detectron2.solver import WarmupParamScheduler
 

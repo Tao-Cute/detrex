@@ -3,7 +3,7 @@ from detectron2.config import LazyCall as L
 from detectron2.modeling.backbone import FPN
 from detrex.modeling.backbone import MyConvViT, MIMConvViT, ConvNextViT, ConvNextWindowViT
 from detectron2.modeling.backbone.fpn import LastLevelMaxPool
-
+import os
 model.backbone = L(FPN)(
     bottom_up=L(ConvNextWindowViT)(),
     in_features=["p0", "p1", "p2", "p3"],
