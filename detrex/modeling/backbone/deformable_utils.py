@@ -12,7 +12,7 @@ from detectron2.modeling.backbone.utils import (
 )
 
 import einops
-from .convnext_utils import ConvNeXtBlock
+from convnext_utils import ConvNeXtBlock
 
 class LayerNorm(nn.Module):
     
@@ -226,7 +226,6 @@ class learnableWindowAttn(nn.Module):
 
     def forward(self, x):
         x = self.proj(x).permute(0, 2, 3, 1)
-        from IPython import embed; embed()
         shortcut = x
         x = self.norm1(x)
         # Window partition
@@ -242,7 +241,7 @@ class learnableWindowAttn(nn.Module):
         x = shortcut + self.drop_path(x)
         x = x + self.drop_path(self.mlp(self.norm2(x)))
 
-        return x
+        return x.permute(0, 3, 1, 2)
 
 
 
@@ -250,6 +249,6 @@ class learnableWindowAttn(nn.Module):
 
 if __name__ == "__main__":
     x = torch.randn(3, 768, 40, 40)
-    model = learnableWindowAttn(768, 768, 12)
+    model = learnableDAT(768, 768, 12)
     # from IPython import embed; embed()
     print(model(x).shape)

@@ -33,8 +33,8 @@ from detectron2.modeling.backbone.utils import (
     window_unpartition,
 
 )
-from .convnext_utils import _create_hybrid_backbone, ConvNeXtBlock
-from .deformable_utils import learnableDAT, learnableConv, learnableWindowAttn
+from convnext_utils import _create_hybrid_backbone, ConvNeXtBlock
+from deformable_utils import learnableDAT, learnableConv, learnableWindowAttn
         
 
 class HybridEmbed(nn.Module):
@@ -566,7 +566,8 @@ class ConvNextWindowViT(ViT):
             raise NotImplementedError(f"{down_sample} is not supported for learnable_downsample")
 
 if __name__ == "__main__":
-    model = ConvNextWindowViT()
+    model = ConvNextWindowViT(down_sample="windowattn")
     x = torch.randn(3, 3, 224, 224)
     x = model(x)
-    from IPython import embed; embed()
+    for k, v in x.items():
+        print(v.shape)
