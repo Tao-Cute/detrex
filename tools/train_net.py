@@ -157,6 +157,7 @@ def do_train(args, cfg):
                 ddp (dict)
     """
     model = instantiate(cfg.model)
+    from IPython import embed; embed()
     logger = logging.getLogger("detectron2")
     logger.info("Model:\n{}".format(model))
     model.to(cfg.train.device)

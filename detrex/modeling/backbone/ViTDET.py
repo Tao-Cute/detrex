@@ -34,20 +34,7 @@ from detectron2.modeling.backbone.utils import (
 
 )
 from .convnext_utils import _create_hybrid_backbone, ConvNeXtBlock
-
-# class learnableDownsample(nn.Moduel):
-#     def __init__(self, in_dim, out_dim):
-#         super().__init__()
-#         LayerNorm(in_dim)
-#         self.proj = nn.Conv2d(in_channels=embed_dim,
-#                                         out_channels=768,
-#                                         kernel_size=3,
-#                                         stride=2,
-#                                         padding=1,
-#                                         dilation=1,
-#                                         groups=1, bias=True)
-
-#         self.down_sample = ConvNeXtBlock()
+from .deformable_utils import learnableDAT, learnableConv, learnableWindowAttn
         
 
 class HybridEmbed(nn.Module):
@@ -476,7 +463,7 @@ class ViT(Backbone):
             self._out_feature_strides[f"p{i_layer}"] = stride_out
             self._out_features.append(f"p{i_layer}")
             stride_out *= 2
-
+        
         self.add_module("learnable_downsample", nn.Conv2d(in_channels=embed_dim,
                                         out_channels=768,
                                         kernel_size=3,
@@ -532,7 +519,8 @@ class ConvNextWindowViT(ViT):
         convnext_pt=False, 
         drop_block=None, 
         window_size=14, 
-        window_block_indexes=[3,4,6,7,9,10]):
+        window_block_indexes=[3, 4, 6, 7, 9, 10],
+        down_sample="common"):
         model_args = dict(
             patch_embed = "ConvNext",
             out_index=out_index, 
@@ -553,7 +541,32 @@ class ConvNextWindowViT(ViT):
         if drop_block is not None:
             for i in drop_block:
                 self.blocks[i] = nn.Identity()
+        
+
+        if down_sample == "DAT":
+            self.add_module("learnable_downsample", learnableDAT(
+                                                in_dim=768,
+                                                out_dim=768,
+                                                num_heads=12,
+                                                ))
+        elif down_sample == "convnext":
+            self.add_module("learnable_downsample", learnableConv(
+                                                in_dim=768,
+                                                out_dim=768,
+                                                ))
+        elif down_sample == "windowattn":
+            self.add_module("learnable_downsample", learnableWindowAttn(
+                                                in_dim=768,
+                                                out_dim=768,
+                                                num_heads=12,
+                                                ))
+        elif down_sample == "common":
+            pass
+        else:
+            raise NotImplementedError(f"{down_sample} is not supported for learnable_downsample")
 
 if __name__ == "__main__":
     model = ConvNextWindowViT()
+    x = torch.randn(3, 3, 224, 224)
+    x = model(x)
     from IPython import embed; embed()

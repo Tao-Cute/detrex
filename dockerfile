@@ -8,4 +8,4 @@ RUN pip install scipy pytorch_lightning==1.9.0 torchmetrics openmim
 RUN pip install einops shapely
 RUN pip install timm fairscale
 RUN pip install deepspeed ipython wandb
-
+RUN pip install deformable-attention
