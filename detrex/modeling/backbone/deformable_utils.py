@@ -12,7 +12,7 @@ from detectron2.modeling.backbone.utils import (
 )
 
 import einops
-from convnext_utils import ConvNeXtBlock
+from .convnext_utils import ConvNeXtBlock
 
 class LayerNorm(nn.Module):
     
