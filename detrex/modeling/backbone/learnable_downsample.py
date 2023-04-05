@@ -244,6 +244,35 @@ class learnableWindowAttn(nn.Module):
         return x.permute(0, 3, 1, 2)
 
 
+class learnableCommonConv(nn.Module):
+    def __init__(self, in_dim, out_dim, ls_init_value=1e-6, conv_mlp=True,):
+        super().__init__()
+        self.norm = LayerNorm()
+        self.proj = nn.Conv2d(in_channels=in_dim,
+                                out_channels=out_dim,
+                                kernel_size=3,
+                                stride=2,
+                                padding=1,
+                                dilation=1,
+                                groups=1, bias=True)
+        
+
+    def forward(self, x):
+        x = self.norm(x)
+        x = self.proj(x)
+        return x
+    
+    
+class learnableMaxPool(nn.Module):
+    def __init__(self, in_dim, out_dim, ls_init_value=1e-6, conv_mlp=True,):
+        super().__init__()
+        self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
+
+    def forward(self, x):
+        x = self.pool(x)
+        return x
+
+
 
 
 

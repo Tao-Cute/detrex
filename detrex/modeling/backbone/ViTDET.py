@@ -34,7 +34,7 @@ from detectron2.modeling.backbone.utils import (
 
 )
 from .convnext_utils import _create_hybrid_backbone, ConvNeXtBlock
-from .deformable_utils import learnableDAT, learnableConv, learnableWindowAttn
+from .learnable_downsample import learnableDAT, learnableConv, learnableWindowAttn
         
 
 class HybridEmbed(nn.Module):
