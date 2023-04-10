@@ -464,7 +464,7 @@ class ViT(Backbone):
             self._out_features.append(f"p{i_layer}")
             stride_out *= 2
         
-        self.add_module("learnable_downsample", learnableCommonConv(768, 768))
+        self.add_module("learnable_downsample", learnableCommonConv(embed_dim, embed_dim))
 
         if self.pos_embed is not None:
             trunc_normal_(self.pos_embed, std=0.02)
@@ -570,6 +570,8 @@ class ConvNextWindowViTSmall(ViT):
         window_block_indexes=[3, 4, 6, 7, 9, 10],
         down_sample="common"):
         model_args = dict(
+            embed_dim=embed_dim,
+            num_heads=num_heads,
             patch_embed = "ConvNext",
             out_index=out_index, 
             out_channel=out_channel,
@@ -593,19 +595,19 @@ class ConvNextWindowViTSmall(ViT):
 
         if down_sample == "DAT":
             self.add_module("learnable_downsample", learnableDAT(
-                                                in_dim=768,
-                                                out_dim=768,
+                                                in_dim=384,
+                                                out_dim=384,
                                                 num_heads=12,
                                                 ))
         elif down_sample == "convnext":
             self.add_module("learnable_downsample", learnableConv(
-                                                in_dim=768,
-                                                out_dim=768,
+                                                in_dim=384,
+                                                out_dim=384,
                                                 ))
         elif down_sample == "windowattn":
             self.add_module("learnable_downsample", learnableWindowAttn(
-                                                in_dim=768,
-                                                out_dim=768,
+                                                in_dim=384,
+                                                out_dim=384,
                                                 num_heads=12,
                                                 ))
         elif down_sample == "common":
