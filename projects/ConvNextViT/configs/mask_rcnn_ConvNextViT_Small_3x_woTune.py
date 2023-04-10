@@ -22,7 +22,6 @@ train.init_checkpoint = "model_zoo/deit_small_patch16_224.pth"
 root_path = './output/MaskRCNNSmall/'
 file_name = root_path + 'EXP' + str(len(os.listdir(root_path)) + 1)
 train.output_dir = file_name
-dataloader.train.total_batch_size = 2
 
 optimizer.lr = 0.0001
 optimizer.weight_decay = 0.1
