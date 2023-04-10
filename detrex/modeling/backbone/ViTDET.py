@@ -586,7 +586,7 @@ class ConvNextWindowViTSmall(ViT):
         if convnext_pt is True:
             model_args = dict(depths=[3, 3], dims=[128, 256, 512, 1024], use_head=False)
             backbone = _create_hybrid_backbone(pretrained=True, pretrained_strict=False, **model_args)
-            self.patch_embed = HybridEmbed(backbone=backbone, patch_size=2, embed_dim=384)
+            self.patch_embed = HybridEmbed(backbone=backbone, patch_size=2, embed_dim=embed_dim)
         
         if drop_block is not None:
             for i in drop_block:
@@ -595,19 +595,75 @@ class ConvNextWindowViTSmall(ViT):
 
         if down_sample == "DAT":
             self.add_module("learnable_downsample", learnableDAT(
-                                                in_dim=384,
-                                                out_dim=384,
+                                                in_dim=embed_dim,
+                                                out_dim=embed_dim,
                                                 num_heads=12,
                                                 ))
         elif down_sample == "convnext":
             self.add_module("learnable_downsample", learnableConv(
-                                                in_dim=384,
-                                                out_dim=384,
+                                                in_dim=embed_dim,
+                                                out_dim=embed_dim,
                                                 ))
         elif down_sample == "windowattn":
             self.add_module("learnable_downsample", learnableWindowAttn(
-                                                in_dim=384,
-                                                out_dim=384,
+                                                in_dim=embed_dim,
+                                                out_dim=embed_dim,
+                                                num_heads=12,
+                                                ))
+        elif down_sample == "common":
+            pass
+        else:
+            raise NotImplementedError(f"{down_sample} is not supported for learnable_downsample")
+
+class ConvNextWindowViTTiny(ViT):
+    def __init__(
+        self,
+        embed_dim=192, num_heads=3, 
+        out_index=[0, 1, 2, 3], out_channel = [128, 256, 192, 192], 
+        convnext_pt=False, 
+        drop_block=None, 
+        window_size=14, 
+        window_block_indexes=[3, 4, 6, 7, 9, 10],
+        down_sample="common"):
+        model_args = dict(
+            embed_dim=embed_dim,
+            num_heads=num_heads,
+            patch_embed = "ConvNext",
+            out_index=out_index, 
+            out_channel=out_channel,
+            window_size=window_size,
+            window_block_indexes=window_block_indexes,
+        residual_block_indexes=[],
+        use_rel_pos=True,
+        )
+        super(ConvNextWindowViTTiny, self).__init__(
+           **model_args
+        )
+        if convnext_pt is True:
+            model_args = dict(depths=[3, 3], dims=[128, 256, 512, 1024], use_head=False)
+            backbone = _create_hybrid_backbone(pretrained=True, pretrained_strict=False, **model_args)
+            self.patch_embed = HybridEmbed(backbone=backbone, patch_size=2, embed_dim=embed_dim)
+        
+        if drop_block is not None:
+            for i in drop_block:
+                self.blocks[i] = nn.Identity()
+        
+
+        if down_sample == "DAT":
+            self.add_module("learnable_downsample", learnableDAT(
+                                                in_dim=embed_dim,
+                                                out_dim=embed_dim,
+                                                num_heads=12,
+                                                ))
+        elif down_sample == "convnext":
+            self.add_module("learnable_downsample", learnableConv(
+                                                in_dim=embed_dim,
+                                                out_dim=embed_dim,
+                                                ))
+        elif down_sample == "windowattn":
+            self.add_module("learnable_downsample", learnableWindowAttn(
+                                                in_dim=embed_dim,
+                                                out_dim=embed_dim,
                                                 num_heads=12,
                                                 ))
         elif down_sample == "common":

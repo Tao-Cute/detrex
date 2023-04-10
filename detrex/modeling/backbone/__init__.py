@@ -34,4 +34,4 @@ from .fan import (
     fan_large_12_p4_hybrid,
 )
 
-from .ViTDET import ConvNextWindowViTBase, ConvNextWindowViTSmall
+from .ViTDET import ConvNextWindowViTBase, ConvNextWindowViTSmall, ConvNextWindowViTTiny
