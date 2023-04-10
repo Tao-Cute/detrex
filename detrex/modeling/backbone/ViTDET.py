@@ -34,7 +34,7 @@ from detectron2.modeling.backbone.utils import (
 
 )
 from .convnext_utils import _create_hybrid_backbone, ConvNeXtBlock
-from .learnable_downsample import learnableDAT, learnableConv, learnableWindowAttn
+from .learnable_downsample import learnableDAT, learnableConv, learnableWindowAttn, learnableCommonConv
         
 
 class HybridEmbed(nn.Module):
@@ -464,13 +464,7 @@ class ViT(Backbone):
             self._out_features.append(f"p{i_layer}")
             stride_out *= 2
         
-        self.add_module("learnable_downsample", nn.Conv2d(in_channels=embed_dim,
-                                        out_channels=768,
-                                        kernel_size=3,
-                                        stride=2,
-                                        padding=1,
-                                        dilation=1,
-                                        groups=1, bias=True))
+        self.add_module("learnable_downsample", learnableCommonConv(768, 768))
 
         if self.pos_embed is not None:
             trunc_normal_(self.pos_embed, std=0.02)
@@ -513,7 +507,7 @@ class ViT(Backbone):
         return final_results
 
 
-class ConvNextWindowViT(ViT):
+class ConvNextWindowViTBase(ViT):
     def __init__(
         self, out_index=[0, 1, 2, 3], out_channel = [128, 256, 768, 768], 
         convnext_pt=False, 
@@ -530,13 +524,67 @@ class ConvNextWindowViT(ViT):
         residual_block_indexes=[],
         use_rel_pos=True,
         )
-        super(ConvNextWindowViT, self).__init__(
+        super(ConvNextWindowViTBase, self).__init__(
            **model_args
         )
         if convnext_pt is True:
             model_args = dict(depths=[3, 3], dims=[128, 256, 512, 1024], use_head=False)
             backbone = _create_hybrid_backbone(pretrained=True, pretrained_strict=False, **model_args)
             self.patch_embed = HybridEmbed(backbone=backbone, patch_size=2, embed_dim=768)
+        
+        if drop_block is not None:
+            for i in drop_block:
+                self.blocks[i] = nn.Identity()
+        
+
+        if down_sample == "DAT":
+            self.add_module("learnable_downsample", learnableDAT(
+                                                in_dim=768,
+                                                out_dim=768,
+                                                num_heads=12,
+                                                ))
+        elif down_sample == "convnext":
+            self.add_module("learnable_downsample", learnableConv(
+                                                in_dim=768,
+                                                out_dim=768,
+                                                ))
+        elif down_sample == "windowattn":
+            self.add_module("learnable_downsample", learnableWindowAttn(
+                                                in_dim=768,
+                                                out_dim=768,
+                                                num_heads=12,
+                                                ))
+        elif down_sample == "common":
+            pass
+        else:
+            raise NotImplementedError(f"{down_sample} is not supported for learnable_downsample")
+
+class ConvNextWindowViTSmall(ViT):
+    def __init__(
+        self,
+        embed_dim=384, num_heads=6, 
+        out_index=[0, 1, 2, 3], out_channel = [128, 256, 384, 384], 
+        convnext_pt=False, 
+        drop_block=None, 
+        window_size=14, 
+        window_block_indexes=[3, 4, 6, 7, 9, 10],
+        down_sample="common"):
+        model_args = dict(
+            patch_embed = "ConvNext",
+            out_index=out_index, 
+            out_channel=out_channel,
+            window_size=window_size,
+            window_block_indexes=window_block_indexes,
+        residual_block_indexes=[],
+        use_rel_pos=True,
+        )
+        super(ConvNextWindowViTSmall, self).__init__(
+           **model_args
+        )
+        if convnext_pt is True:
+            model_args = dict(depths=[3, 3], dims=[128, 256, 512, 1024], use_head=False)
+            backbone = _create_hybrid_backbone(pretrained=True, pretrained_strict=False, **model_args)
+            self.patch_embed = HybridEmbed(backbone=backbone, patch_size=2, embed_dim=384)
         
         if drop_block is not None:
             for i in drop_block:

@@ -247,7 +247,7 @@ class learnableWindowAttn(nn.Module):
 class learnableCommonConv(nn.Module):
     def __init__(self, in_dim, out_dim, ls_init_value=1e-6, conv_mlp=True,):
         super().__init__()
-        self.norm = LayerNorm()
+        self.norm = LayerNorm(out_dim)
         self.proj = nn.Conv2d(in_channels=in_dim,
                                 out_channels=out_dim,
                                 kernel_size=3,
