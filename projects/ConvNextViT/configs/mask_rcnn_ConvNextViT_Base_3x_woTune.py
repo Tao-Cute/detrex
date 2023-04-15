@@ -23,7 +23,7 @@ root_path = './output/MaskRCNN/'
 file_name = root_path + 'EXP' + str(len(os.listdir(root_path)) + 1)
 train.output_dir = file_name
 
-optimizer.lr = 0.0001
+optimizer.lr = 0.00015
 optimizer.weight_decay = 0.1
 optimizer.params.overrides = {"pos_embed": {"weight_decay": 0.0}}
 

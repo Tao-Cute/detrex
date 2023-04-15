@@ -7,7 +7,7 @@ from detrex.modeling.backbone import MyConvViT, MIMConvViT, ConvNextViT, ConvNex
 from detectron2.modeling.backbone.fpn import LastLevelMaxPool
 
 model.backbone = L(FPN)(
-    bottom_up=L(ConvNextWindowViTBase)(convnext_pt=True, drop_block=None, 
+    bottom_up=L(ConvNextWindowViTSmall)(convnext_pt=True, drop_block=None, 
                                     window_size=14,
                                     window_block_indexes=[0, 1, 3, 4, 6, 7, 9, 10],
                                     down_sample="common"),
@@ -15,8 +15,8 @@ model.backbone = L(FPN)(
     out_channels=256,
     top_block=L(LastLevelMaxPool)(),
 )
-train.init_checkpoint = "model_zoo/deit_base_patch16_224.pth"
-train.output_dir = "./output/cascade_DeiT_Base"
+train.init_checkpoint = "model_zoo/deit_small_patch16_224.pth"
+train.output_dir = "./output/cascade_DeiT_Small"
 
 optimizer.lr = 0.0001
 optimizer.weight_decay = 0.1
