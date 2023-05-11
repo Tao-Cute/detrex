@@ -624,7 +624,7 @@ class ConvNextWindowViTTiny(ViT):
     def __init__(
         self,
         embed_dim=192, num_heads=3, 
-        out_index=[0, 1, 2, 3], out_channel = [128, 256, 192, 192], 
+        out_index=[0, 1, 2, 3], out_channel = [96, 192, 192, 192], 
         convnext_pt=False, 
         drop_block=None, 
         window_size=14, 
@@ -645,8 +645,8 @@ class ConvNextWindowViTTiny(ViT):
            **model_args
         )
         if convnext_pt is True:
-            model_args = dict(depths=[3, 3], dims=[128, 256, 512, 1024], use_head=False)
-            backbone = _create_hybrid_backbone(pretrained=True, pretrained_strict=False, **model_args)
+            model_args = dict(depths=[3, 3], dims=[96, 192, 192, 192], use_head=False)
+            backbone = _create_hybrid_backbone("convnext_small", pretrained=True, pretrained_strict=False, **model_args)
             self.patch_embed = HybridEmbed(backbone=backbone, patch_size=2, embed_dim=embed_dim)
         
         if drop_block is not None:
