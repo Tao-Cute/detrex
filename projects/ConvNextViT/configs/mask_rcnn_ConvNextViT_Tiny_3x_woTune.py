@@ -10,9 +10,9 @@ from functools import partial
 from .common.lr_decay import get_vit_lr_decay_rate
 
 model.backbone = L(FPN)(
-    bottom_up=L(ConvNextWindowViTTiny)(convnext_pt=True, drop_block=[0, 1, 2], 
+    bottom_up=L(ConvNextWindowViTTiny)(convnext_pt=True, drop_block=None,
                                     window_size=14,
-                                    window_block_indexes=[3, 4, 6, 7, 9, 10],
+                                    window_block_indexes=[0, 1, 3, 4, 6, 7, 9, 10],
                                     down_sample="common"),
     in_features=["p0", "p1", "p2", "p3"],
     out_channels=256,
@@ -23,8 +23,8 @@ root_path = './output/MaskRCNNTiny/'
 file_name = root_path + 'EXP' + str(len(os.listdir(root_path)) + 1)
 train.output_dir = file_name
 
-optimizer.lr = 0.0001
+optimizer.lr = 0.00015
 optimizer.weight_decay = 0.1
 optimizer.params.overrides = {"pos_embed": {"weight_decay": 0.0}}
 
-optimizer.params.lr_factor_func = partial(get_vit_lr_decay_rate, num_layers=12, lr_decay_rate=0.9)
+# optimizer.params.lr_factor_func = partial(get_vit_lr_decay_rate, num_layers=12, lr_decay_rate=0.9)

@@ -18,6 +18,6 @@ model.backbone = L(FPN)(
 train.init_checkpoint = "model_zoo/deit_small_patch16_224.pth"
 train.output_dir = "./output/cascade_DeiT_Small"
 
-optimizer.lr = 0.0001
+optimizer.lr = 0.00015
 optimizer.weight_decay = 0.1
 optimizer.params.overrides = {"pos_embed": {"weight_decay": 0.0}}

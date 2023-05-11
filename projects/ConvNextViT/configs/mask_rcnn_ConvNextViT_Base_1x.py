@@ -10,7 +10,7 @@ from functools import partial
 from .common.lr_decay import get_vit_lr_decay_rate
 
 model.backbone = L(FPN)(
-    bottom_up=L(ConvNextWindowViTSmall)(convnext_pt=False, drop_block=None, 
+    bottom_up=L(ConvNextWindowViTBase)(convnext_pt=False, drop_block=None, 
                                     window_size=14,
                                     window_block_indexes=[0, 1, 3, 4, 6, 7, 9, 10],
                                     down_sample="common"),
@@ -18,8 +18,8 @@ model.backbone = L(FPN)(
     out_channels=256,
     top_block=L(LastLevelMaxPool)(),
 )
-train.init_checkpoint = "model_zoo/ConvNextViT_Small.ckpt"
-file_name = "./output/ConvNextViT_Small_Tune_lr15e-4_1x"
+train.init_checkpoint = "model_zoo/ConvNextViT_Base.ckpt"
+file_name = "./output/ConvNextViT_Base_Tune_lr15e-4_1x"
 train.output_dir = file_name
 
 optimizer.lr = 0.00015

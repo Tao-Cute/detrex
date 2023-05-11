@@ -10,7 +10,7 @@ from functools import partial
 from .common.lr_decay import get_vit_lr_decay_rate
 
 model.backbone = L(FPN)(
-    bottom_up=L(ConvNextWindowViTSmall)(convnext_pt=False, drop_block=None, 
+    bottom_up=L(ConvNextWindowViTSmall)(convnext_pt=True, drop_block=None, 
                                     window_size=14,
                                     window_block_indexes=[0, 1, 3, 4, 6, 7, 9, 10],
                                     down_sample="common"),
@@ -19,12 +19,16 @@ model.backbone = L(FPN)(
     top_block=L(LastLevelMaxPool)(),
 )
 train.init_checkpoint = "model_zoo/ConvNextViT_Small.ckpt"
-file_name = "./output/ConvNextViT_Small_Tune_lr15e-4_1x"
+root_path = './output/MaskRCNNSmallTune/'
+file_name = root_path + 'EXP' + str(len(os.listdir(root_path)) + 1)
 train.output_dir = file_name
 
 optimizer.lr = 0.00015
-optimizer.weight_decay = 0.1
+optimizer.weight_decay = 0.05
 optimizer.params.overrides = {"pos_embed": {"weight_decay": 0.0}}
+
+# optimizer.params.lr_factor_func = partial(get_vit_lr_decay_rate, num_layers=12, lr_decay_rate=0.7)
+
 
 train.max_iter = 90000
 lr_multiplier = L(WarmupParamScheduler)(
