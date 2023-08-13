@@ -13,21 +13,24 @@ model.backbone = L(FPN)(
     bottom_up=L(ConvNextWindowViTSmall)(convnext_pt=True, drop_block=None, 
                                     window_size=14,
                                     window_block_indexes=[0, 1, 3, 4, 6, 7, 9, 10],
+                                    out_ids=8,
                                     down_sample="common"),
     in_features=["p0", "p1", "p2", "p3"],
     out_channels=256,
     top_block=L(LastLevelMaxPool)(),
 )
 train.init_checkpoint = "model_zoo/ConvNextViT_Small.ckpt"
+train.clip_grad.enabled = False
 root_path = './output/MaskRCNNSmallTune/'
 file_name = root_path + 'EXP' + str(len(os.listdir(root_path)) + 1)
 train.output_dir = file_name
 
 optimizer.lr = 0.00015
-optimizer.weight_decay = 0.05
+optimizer.weight_decay = 0.1
 optimizer.params.overrides = {"pos_embed": {"weight_decay": 0.0}}
 
 # optimizer.params.lr_factor_func = partial(get_vit_lr_decay_rate, num_layers=12, lr_decay_rate=0.7)
+dataloader.train.total_batch_size = 2
 
 
 train.max_iter = 90000

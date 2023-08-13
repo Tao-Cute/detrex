@@ -499,7 +499,8 @@ class ViT(Backbone):
             x = x + pos_embed
         for i, blk in enumerate(self.blocks):
             x = blk(x)
-        outputs.append(x.permute(0, 3, 1, 2).contiguous())
+            if i == self.out_ids:
+                outputs.append(x.permute(0, 3, 1, 2).contiguous())
         outputs.append(self.learnable_downsample(x.permute(0, 3, 1, 2).contiguous()))
         final_results = {}
 
@@ -568,11 +569,13 @@ class ConvNextWindowViTSmall(ViT):
     def __init__(
         self,
         embed_dim=384, num_heads=6, 
-        out_index=[0, 1, 2, 3], out_channel = [128, 256, 384, 384], 
+        out_index=[0, 1, 2, 3], 
+        out_channel = [128, 256, 384, 384], 
         convnext_pt=False, 
         drop_block=None, 
         window_size=14, 
         window_block_indexes=[3, 4, 6, 7, 9, 10],
+        out_ids=11,
         down_sample="common"):
         model_args = dict(
             embed_dim=embed_dim,
@@ -582,8 +585,9 @@ class ConvNextWindowViTSmall(ViT):
             out_channel=out_channel,
             window_size=window_size,
             window_block_indexes=window_block_indexes,
-        residual_block_indexes=[],
-        use_rel_pos=True,
+            out_ids=out_ids,
+            residual_block_indexes=[],
+            use_rel_pos=True,
         )
         super(ConvNextWindowViTSmall, self).__init__(
            **model_args
