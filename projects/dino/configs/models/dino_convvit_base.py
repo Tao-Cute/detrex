@@ -9,6 +9,7 @@ model.backbone = L(ConvNextWindowViTBase)(
     convnext_pt=True, drop_block=None, 
     window_size=14,
     window_block_indexes=[0, 1, 3, 4, 6, 7, 9, 10],
+    out_index=[1, 2, 3],
     down_sample="common")
 
 
