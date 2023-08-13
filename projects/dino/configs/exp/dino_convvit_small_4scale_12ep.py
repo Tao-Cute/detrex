@@ -10,4 +10,3 @@ from ..models.dino_convvit_small import model
 train.init_checkpoint = "model_zoo/ConvNextViT_Small.ckpt"
 train.output_dir = "./output/dino_ConvNextViT_small_4scale_12ep"
 
-dataloader.train.total_batch_size = 2
